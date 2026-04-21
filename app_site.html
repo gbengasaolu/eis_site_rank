@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>EIS SiteRank · Host Site Decision Support</title>
+<style>
+/* ── Reset & tokens ── */
+:root{
+  --bg:#f4f6f9;--surface:#fff;--border:#dde3ed;
+  --primary:#1a56a0;--primary-dk:#133f7a;--accent:#2e86c1;
+  --success:#1e8449;--warn:#b7770d;--danger:#922b21;
+  --text:#1a1f2e;--muted:#6b7a99;
+  --radius:10px;--shadow:0 2px 12px rgba(26,86,160,.10);
+  --header-h:auto;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── Header ── */
+header{
+  background:linear-gradient(135deg,#1a3a6b 0%,#1a56a0 60%,#2e86c1 100%);
+  color:#fff;padding:20px 24px 18px;
+}
+header h1{font-size:clamp(1.2rem,4vw,1.75rem);font-weight:700;letter-spacing:-.5px;display:flex;align-items:baseline;flex-wrap:wrap;gap:6px}
+header h1 span{opacity:.7;font-weight:400;font-size:clamp(.8rem,2.5vw,.95rem)}
+header p{margin-top:6px;opacity:.85;font-size:clamp(.8rem,2.2vw,.9rem);line-height:1.5;max-width:680px}
+
+/* ── Nav tabs (mobile) ── */
+.tab-bar{display:none;background:var(--surface);border-bottom:2px solid var(--border);position:sticky;top:0;z-index:100}
+.tab-bar button{flex:1;padding:12px 4px;border:none;background:none;font-size:.85rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .18s}
+.tab-bar button.active{color:var(--primary);border-bottom-color:var(--primary)}
+
+/* ── Layout ── */
+main{max-width:1200px;margin:0 auto;padding:20px 16px 60px}
+.grid{display:grid;grid-template-columns:380px 1fr;gap:20px;align-items:start}
+
+/* ── Card ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px}
+.card-title{font-size:.95rem;font-weight:700;color:var(--primary);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+
+/* ── Form elements ── */
+label{display:block;font-size:.78rem;font-weight:600;color:var(--muted);margin-bottom:3px;margin-top:12px;text-transform:uppercase;letter-spacing:.4px}
+label:first-of-type{margin-top:0}
+select,input[type=text]{
+  width:100%;padding:9px 11px;border:1.5px solid var(--border);
+  border-radius:7px;font-size:.9rem;color:var(--text);background:#fff;
+  transition:border .2s;-webkit-appearance:none;appearance:none;
+}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7a99' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+select:focus,input:focus{outline:none;border-color:var(--accent)}
+
+/* ── Criteria header & panel ── */
+.criteria-header{margin-top:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.criteria-header-label{font-size:.78rem;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.4px}
+#criteriaPanel{display:none;background:#f7faff;border:1.5px solid #c3d9f5;border-radius:8px;padding:14px;margin-top:8px}
+#criteriaPanel h4{font-size:.8rem;font-weight:700;color:var(--primary);margin-bottom:8px}
+#criteriaPanel .sub{font-weight:400;color:var(--muted)}
+.crit-check-row{display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #e4ecf7}
+.crit-check-row:last-child{border-bottom:none}
+.crit-check-row input[type=checkbox]{margin-top:2px;flex-shrink:0;width:16px;height:16px;cursor:pointer;accent-color:var(--primary)}
+.crit-name{font-size:.84rem;font-weight:600;color:var(--text)}
+.crit-tip{font-size:.74rem;color:var(--muted);line-height:1.3;margin-top:1px}
+.remove-btn{margin-left:auto;background:none;border:none;color:var(--danger);cursor:pointer;font-size:.85rem;padding:2px 5px;flex-shrink:0;border-radius:4px}
+.remove-btn:hover{background:#fdecea}
+.add-crit-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.add-crit-row input{flex:1;min-width:110px}
+
+/* ── Metric grid ── */
+.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin-top:8px}
+.metric-item label{margin-top:0;font-size:.76rem}
+.tip{font-size:.71rem;color:var(--muted);margin-top:2px;line-height:1.3}
+
+/* ── Score preview ── */
+.score-preview{background:#eef4fb;border:1px solid #c3d9f5;border-radius:8px;padding:12px 14px;margin-top:14px;display:flex;align-items:center;gap:14px}
+.score-num{font-size:2rem;font-weight:800;color:var(--primary);line-height:1}
+.score-label{font-size:.78rem;color:var(--muted)}
+.score-bar-wrap{flex:1;height:8px;background:#d6e6f8;border-radius:4px;overflow:hidden}
+.score-bar{height:100%;border-radius:4px;background:linear-gradient(90deg,#2e86c1,#1a56a0);transition:width .3s}
+
+/* ── Buttons ── */
+.btn-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+button{padding:9px 16px;border:none;border-radius:7px;font-size:.85rem;font-weight:600;cursor:pointer;transition:all .18s;touch-action:manipulation}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover,.btn-primary:active{background:var(--primary-dk)}
+.btn-secondary{background:#e8edf6;color:var(--primary)}
+.btn-secondary:hover{background:#d6e0f0}
+.btn-sm{padding:5px 10px;font-size:.76rem}
+.btn-danger{background:#fdecea;color:var(--danger)}
+.btn-danger:hover{background:#f9d0cc}
+.btn-export{background:#eafaf1;color:var(--success)}
+.btn-export:hover{background:#d4efdf}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a3a6b;color:#fff;padding:10px 20px;border-radius:8px;font-size:.85rem;opacity:0;pointer-events:none;transition:opacity .3s;z-index:999;white-space:nowrap;max-width:90vw;text-align:center}
+#toast.show{opacity:1}
+
+/* ── Rankings table ── */
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:8px;border-radius:8px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:.8rem;min-width:500px}
+th{background:#eef4fb;color:var(--primary);font-weight:700;padding:9px 10px;text-align:left;border-bottom:2px solid var(--border);white-space:nowrap;font-size:.75rem;position:sticky;top:0}
+td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr.selected-row td{background:#e6f0fb}
+tr:hover td{background:#f7faff;cursor:pointer}
+
+/* ── Rank & score visuals ── */
+.rank-badge{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;font-weight:800;font-size:.82rem;flex-shrink:0}
+.rank-1{background:#ffd700;color:#7a5c00}
+.rank-2{background:#c0c0c0;color:#444}
+.rank-3{background:#cd7f32;color:#fff}
+.rank-other{background:#e8edf6;color:var(--muted)}
+.score-chip{display:inline-block;padding:2px 8px;border-radius:12px;font-weight:700;font-size:.8rem;white-space:nowrap}
+.chip-hi{background:#d4efdf;color:var(--success)}
+.chip-mid{background:#fef3cd;color:var(--warn)}
+.chip-lo{background:#fdecea;color:var(--danger)}
+.chip-none{background:#f0f0f0;color:var(--muted)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin:0 1px;flex-shrink:0}
+.dot-yes{background:#1e8449}
+.dot-no{background:#d0d5e0}
+.dot-blank{background:#ffe082}
+
+/* ── Legend & notes ── */
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:.76rem;color:var(--muted);margin-bottom:10px}
+.legend span{display:flex;align-items:center;gap:4px}
+.scoring-note{margin-top:12px;font-size:.74rem;color:var(--muted);line-height:1.6;border-top:1px solid var(--border);padding-top:10px}
+
+/* ── Empty state ── */
+.empty-state{text-align:center;padding:40px 16px;color:var(--muted)}
+.empty-state svg{margin-bottom:10px;opacity:.3}
+.empty-state p{font-size:.9rem;line-height:1.5}
+
+/* ── Mobile card for ranked items ── */
+.mobile-rank-list{display:none;flex-direction:column;gap:10px;margin-top:8px}
+.rank-card{background:#fff;border:1px solid var(--border);border-radius:9px;padding:12px 14px;cursor:pointer;transition:box-shadow .15s}
+.rank-card:hover,.rank-card:active{box-shadow:0 2px 10px rgba(26,86,160,.13)}
+.rank-card.selected-row{border-color:var(--accent);background:#eef4fb}
+.rank-card-top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.rank-card-name{font-size:.84rem;font-weight:600;color:var(--text);flex:1;word-break:break-word;line-height:1.3}
+.rank-card-dots{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+.rank-card-dot-item{display:flex;align-items:center;gap:4px;font-size:.72rem;color:var(--muted)}
+.rank-card-footer{display:flex;align-items:center;justify-content:space-between;margin-top:4px}
+.rank-card-ts{font-size:.71rem;color:var(--muted)}
+
+/* ════════════════════════════════
+   BREAKPOINTS
+   ════════════════════════════════ */
+
+/* Tablet: stack layout, keep table */
+@media(max-width:900px){
+  .grid{grid-template-columns:1fr}
+  .metric-grid{grid-template-columns:1fr 1fr}
+}
+
+/* Mobile: tab nav, card-based rankings */
+@media(max-width:600px){
+  header{padding:16px 16px 14px}
+  main{padding:0 0 80px}
+  .card{border-radius:0;border-left:none;border-right:none;box-shadow:none;padding:16px}
+  .tab-bar{display:flex}
+  .grid{gap:0}
+  .grid > div{display:none}
+  .grid > div.tab-active{display:block}
+  .metric-grid{grid-template-columns:1fr}
+  .table-wrap{display:none}
+  .mobile-rank-list{display:flex}
+  .add-crit-row{flex-direction:column}
+  .add-crit-row input{width:100%}
+  .btn-row{gap:6px}
+  .btn-row button{flex:1;text-align:center;padding:10px 8px;font-size:.82rem}
+  #toast{bottom:72px}
+  .scoring-note{border-radius:0}
+}
+
+@media(max-width:360px){
+  .metric-grid{grid-template-columns:1fr}
+  header h1{font-size:1.1rem}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>EIS SiteRank <span>· Host Site Decision Support</span></h1>
+  <p>Evaluate and rank recruiting sites as you move through the process. Score each site on your chosen criteria — add your own, exclude ones that don't apply, and your ranked list updates instantly based only on criteria you've answered.</p>
+</header>
+
+<!-- Mobile tab bar -->
+<div class="tab-bar" id="tabBar">
+  <button class="active" onclick="switchTab(0)">✏️ Evaluate</button>
+  <button onclick="switchTab(1)">📊 Rankings</button>
+</div>
+
+<main>
+  <div class="grid" id="mainGrid">
+
+    <!-- ── LEFT: Entry Form ── -->
+    <div class="tab-active" id="tabForm">
+      <div class="card">
+        <div class="card-title">
+          <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Site Evaluation Form
+        </div>
+
+        <label for="siteSelect">Recruiting Site</label>
+        <select id="siteSelect"><option value="">— Select a site —</option></select>
+
+        <label for="customSite">Or enter a new site manually</label>
+        <input type="text" id="customSite" placeholder="e.g. NCIRD-DBD-RVB-Georgia-2026-01" autocomplete="off"/>
+
+        <div class="criteria-header">
+          <span class="criteria-header-label">Evaluation Criteria</span>
+          <button class="btn-secondary btn-sm" onclick="toggleCriteriaPanel()">⚙ Manage Criteria</button>
+        </div>
+
+        <div id="criteriaPanel">
+          <h4>Active Criteria <span class="sub">— uncheck to exclude from scoring</span></h4>
+          <div id="criteriaCheckList"></div>
+          <h4 style="margin-top:12px;margin-bottom:7px">Add a Custom Criterion</h4>
+          <div class="add-crit-row">
+            <input type="text" id="newCritLabel" placeholder="Label (e.g. Location Preference)"/>
+            <input type="text" id="newCritTip"   placeholder="Helper text (optional)"/>
+            <button class="btn-primary btn-sm" onclick="addCustomCriterion()">+ Add</button>
+          </div>
+        </div>
+
+        <div class="metric-grid" id="metricGrid"></div>
+
+        <div class="score-preview">
+          <div>
+            <div class="score-num" id="previewScore">—</div>
+            <div class="score-label" id="previewDenom">/ 0 answered</div>
+          </div>
+          <div style="flex:1">
+            <div class="score-label" style="margin-bottom:4px">Score preview (answered only)</div>
+            <div class="score-bar-wrap"><div class="score-bar" id="previewBar" style="width:0%"></div></div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn-primary" onclick="saveSite()">💾 Save</button>
+          <button class="btn-secondary" onclick="clearForm()">✕ Clear</button>
+          <button class="btn-danger" onclick="deleteSite()">🗑 Delete</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn-export" onclick="exportCSV()">⬇ CSV</button>
+          <button class="btn-export" onclick="exportJSON()">⬇ JSON</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RIGHT: Rankings ── -->
+    <div id="tabRankings">
+      <div class="card">
+        <div class="card-title">
+          <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+          Live Rankings
+        </div>
+
+        <div class="legend">
+          <span><span class="dot dot-yes"></span> Yes</span>
+          <span><span class="dot dot-no"></span> No</span>
+          <span><span class="dot dot-blank"></span> Not answered</span>
+        </div>
+
+        <!-- Desktop/tablet: scrollable table -->
+        <div class="table-wrap">
+          <table>
+            <thead><tr id="tableHead"></tr></thead>
+            <tbody id="rankBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Mobile: card list -->
+        <div class="mobile-rank-list" id="mobileRankList"></div>
+
+        <div class="scoring-note">
+          <strong>How scoring works:</strong> "Yes" = 1 pt · "No" = 0 pts · unanswered = not counted.
+          Score shown as <em>Yes / Answered</em>. Rankings are based only on criteria you've answered — partial entries rank fairly alongside fully-scored ones.
+          Ties broken alphabetically. Tap any row or card to edit it.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   EIS SiteRank — fully responsive single-file app
+   SHEET 1 → SITE_LIST  |  SHEET 2 → DEFAULT_METRICS
+   Scoring: yes / answered active criteria (unanswered = ignored)
+   Storage: localStorage  |  Ties: alphabetical (stable)
+═══════════════════════════════════════════════════════════════ */
+
+// ── Sheet 1: Recruiting site list ───────────────────────────────
+const SITE_LIST = [
+  "CFA-ID-OD-Georgia-2026-01","GHC-GID-ISB-Georgia-2026-01",
+  "GHC-GID-PEB-Georgia-2026-01","NCCDPHP-DCPC-EARB-Georgia-2026-01",
+  "NCCDPHP-DNPAO-NB-Georgia-2026-01","NCCDPHP-DNPAO-OPCB-Georgia-2026-01",
+  "NCCDPHP-DNPAO-PAHB-Georgia-2026-01","NCEZID-DFWED-EDEB-Georgia-2026-01",
+  "NCEZID-DFWED-MDB-Georgia-2026-01","NCEZID-DFWED-ORPB-Georgia-2026-01",
+  "NCEZID-DGMH-THB-Georgia-2026-01","NCEZID-DGMH-TRAMB-Georgia-2026-01",
+  "NCEZID-DHCPP-BSPB-Georgia-2026-01","NCEZID-DHQP-IICB-Georgia-2026-01",
+  "NCEZID-DHQP-MPSB-Georgia-2026-01","NCEZID-DIDRI-AIP-Alaska-2026-01",
+  "NCEZID-DIDRI-RRRSB-Georgia-2026-01","NCEZID-DVBD-ADB-Colorado-2026-01",
+  "NCEZID-DVBD-BDB-Colorado-2026-01","NCHHSTP-DHP-DRB-Georgia-2026-01",
+  "NCHHSTP-DSTDP-SDSB-Georgia-2026-01","NCHS-DHNES-AB-Maryland-2026-01",
+  "NCIPC-DOP-ESB-Georgia-2026-01","NCIPC-DOP-HSRB-Georgia-2026-01",
+  "NCIPC-DVP-OD-Georgia-2026-01","NCIPC-DVP-SB-Georgia-2026-01",
+  "NCIRD-CORVD-EB-Georgia-2026-01","NCIRD-DBD-MPDE-Georgia-2026-01",
+  "NCIRD-DBD-PSEB-Georgia-2026-01","NCIRD-DBD-PSEB-Georgia-2026-02",
+  "NCIRD-DVD-VGB-Georgia-2026-01","NCIRD-ID-EPB-Georgia-2026-01",
+  "NCIRD-ID-GIB-Georgia-2026-01","NIOSH-DFSE-HIB-Ohio-2026-01",
+  "NIOSH-DFSE-OD-Ohio-2026-01","NIOSH-RHD-SB-West Virginia-2026-01",
+  "OPHDST-OD-OS-Georgia-2026-01",
+  "PHIC-DWD-ELWB-Arizona-Maricopa County-2026-01",
+  "PHIC-DWD-ELWB-Arizona-Pima County-2026-01","PHIC-DWD-ELWB-California-2026-01",
+  "PHIC-DWD-ELWB-California-LA County-2026-01","PHIC-DWD-ELWB-California-Santa Clara-2026-01",
+  "PHIC-DWD-ELWB-Hawaii-2026-01","PHIC-DWD-ELWB-Indiana-2026-01",
+  "PHIC-DWD-ELWB-Maine-2026-01","PHIC-DWD-ELWB-Minnesota-2026-01",
+  "PHIC-DWD-ELWB-Montana-2026-01","PHIC-DWD-ELWB-Nevada-2026-01",
+  "PHIC-DWD-ELWB-Nevada-Las Vegas-2026-01","PHIC-DWD-ELWB-New Jersey-2026-01",
+  "PHIC-DWD-ELWB-New York-2026-01","PHIC-DWD-ELWB-New York-NYC-2026-01",
+  "PHIC-DWD-ELWB-Pennsylvania-2026-01","PHIC-DWD-ELWB-Pennsylvania-Philadelphia-2026-01",
+  "PHIC-DWD-ELWB-Puerto Rico-2026-01","PHIC-DWD-ELWB-Vermont-2026-01",
+  "PHIC-DWD-ELWB-Virgin Islands-2026-01","PHIC-DWD-ELWB-Washington-2026-01"
+];
+
+// ── Sheet 2: Default evaluation criteria ────────────────────────
+const DEFAULT_METRICS = [
+  { key:"sent_email",    label:"Received Email",       tip:"Did you receive an introductory email from this site?" },
+  { key:"skill_align",   label:"Skill Alignment",      tip:"Does the site's work align with your technical background and skills?" },
+  { key:"continuity",    label:"Continuity Promise",   tip:"Did the supervisor indicate ongoing/follow-on work beyond EIS tenure?" },
+  { key:"team_connect",  label:"Connected w/ Team",    tip:"Did you feel a genuine connection with the team during EIS conference discussions?" },
+  { key:"stability",     label:"Stability Promise",    tip:"Does the site offer a stable, well-resourced environment for your fellowship?" },
+  { key:"mentorship",    label:"Mentorship Promise",   tip:"Is there a clear mentorship structure and committed supervisor?" },
+  { key:"intuition",     label:"Intuition / Fit",      tip:"What does your gut say? Would you feel energised working there?" },
+  { key:"interview_exp", label:"Interview Experience", tip:"Was the interview experience positive, organised, and engaging?" },
+  { key:"epi_aid",       label:"Epi-Aid Promise",      tip:"Is there a realistic prospect of field deployments / Epi-Aids from this site?" }
+];
+
+const STORAGE_KEY = "eis_siterank_v1";
+
+// ── State ────────────────────────────────────────────────────────
+let evaluations  = {};
+let METRICS      = [];
+let excludedKeys = new Set();
+let currentSite  = null;
+let activeTab    = 0; // 0=form, 1=rankings
+
+// ── Bootstrap ────────────────────────────────────────────────────
+function init() {
+  loadStorage();
+  buildSiteDropdown();
+  buildMetricGrid();
+  renderTable();
+  document.getElementById("siteSelect").addEventListener("change", onSiteSelect);
+  document.getElementById("customSite").addEventListener("input",  onCustomSite);
+}
+
+// ── Mobile tab switching ─────────────────────────────────────────
+function switchTab(idx) {
+  activeTab = idx;
+  const tabs   = document.querySelectorAll(".tab-bar button");
+  const panels = [document.getElementById("tabForm"), document.getElementById("tabRankings")];
+  tabs.forEach((t,i)   => t.classList.toggle("active", i===idx));
+  panels.forEach((p,i) => p.classList.toggle("tab-active", i===idx));
+}
+
+// ── Persistence ──────────────────────────────────────────────────
+function loadStorage() {
+  try { evaluations = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch(e) { evaluations = {}; }
+  try {
+    const s = JSON.parse(localStorage.getItem(STORAGE_KEY + "_criteria"));
+    if (s) { METRICS = [...DEFAULT_METRICS,...(s.custom||[])]; excludedKeys = new Set(s.excluded||[]); }
+    else   { METRICS = [...DEFAULT_METRICS]; }
+  } catch(e) { METRICS = [...DEFAULT_METRICS]; }
+}
+
+function saveStorage() { localStorage.setItem(STORAGE_KEY, JSON.stringify(evaluations)); }
+
+function saveCriteriaStorage() {
+  const custom = METRICS.filter(m => !DEFAULT_METRICS.find(d => d.key===m.key));
+  localStorage.setItem(STORAGE_KEY+"_criteria", JSON.stringify({custom, excluded:[...excludedKeys]}));
+}
+
+// ── Site dropdown ────────────────────────────────────────────────
+function buildSiteDropdown() {
+  const sel = document.getElementById("siteSelect");
+  while (sel.options.length > 1) sel.remove(1);
+  SITE_LIST.forEach(s => { const o=document.createElement("option"); o.value=s; o.textContent=s; sel.appendChild(o); });
+}
+
+// ── Metric form ──────────────────────────────────────────────────
+function buildMetricGrid() {
+  const grid = document.getElementById("metricGrid");
+  grid.innerHTML = "";
+  METRICS.filter(m => !excludedKeys.has(m.key)).forEach(m => {
+    const div = document.createElement("div");
+    div.className = "metric-item";
+    div.innerHTML = `
+      <label for="m_${m.key}" title="${escH(m.tip)}">${escH(m.label)}</label>
+      <select id="m_${m.key}" class="metric-sel" data-key="${m.key}">
+        <option value="">— not yet —</option>
+        <option value="1">Yes</option>
+        <option value="0">No</option>
+      </select>
+      <div class="tip">${escH(m.tip)}</div>`;
+    grid.appendChild(div);
+  });
+  document.querySelectorAll(".metric-sel").forEach(s => s.addEventListener("change", updatePreview));
+  if (currentSite) loadSiteIntoForm(currentSite);
+}
+
+// ── Criteria manager ─────────────────────────────────────────────
+function toggleCriteriaPanel() {
+  const p = document.getElementById("criteriaPanel");
+  const open = p.style.display==="none" || !p.style.display;
+  p.style.display = open ? "block" : "none";
+  if (open) renderCriteriaCheckList();
+}
+
+function renderCriteriaCheckList() {
+  document.getElementById("criteriaCheckList").innerHTML = METRICS.map(m => {
+    const isActive  = !excludedKeys.has(m.key);
+    const isCustom  = !DEFAULT_METRICS.find(d => d.key===m.key);
+    return `<div class="crit-check-row">
+      <input type="checkbox" id="chk_${m.key}" ${isActive?"checked":""} onchange="toggleCriterion('${m.key}')">
+      <div style="flex:1">
+        <div class="crit-name">${escH(m.label)}</div>
+        <div class="crit-tip">${escH(m.tip)}</div>
+      </div>
+      ${isCustom?`<button class="remove-btn" onclick="removeCustomCriterion('${m.key}')" title="Remove">✕</button>`:""}
+    </div>`;
+  }).join("");
+}
+
+function toggleCriterion(key) {
+  excludedKeys.has(key) ? excludedKeys.delete(key) : excludedKeys.add(key);
+  saveCriteriaStorage(); buildMetricGrid(); updatePreview(); renderTable(); renderCriteriaCheckList();
+}
+
+function addCustomCriterion() {
+  const label = document.getElementById("newCritLabel").value.trim();
+  if (!label) { toast("⚠ Please enter a label."); return; }
+  const tip = document.getElementById("newCritTip").value.trim() || label;
+  const key = "custom_"+label.toLowerCase().replace(/[^a-z0-9]/g,"_").slice(0,28)+"_"+Date.now();
+  METRICS.push({key,label,tip});
+  saveCriteriaStorage();
+  document.getElementById("newCritLabel").value = "";
+  document.getElementById("newCritTip").value   = "";
+  buildMetricGrid(); renderCriteriaCheckList(); updatePreview(); renderTable();
+  toast(`✓ "${label}" added.`);
+}
+
+function removeCustomCriterion(key) {
+  const m = METRICS.find(m=>m.key===key);
+  if (!confirm(`Remove "${m?m.label:key}"? Saved scores will be cleared.`)) return;
+  METRICS = METRICS.filter(m=>m.key!==key);
+  excludedKeys.delete(key);
+  Object.values(evaluations).forEach(rec=>delete rec[key]);
+  saveCriteriaStorage(); saveStorage(); buildMetricGrid(); renderCriteriaCheckList(); updatePreview(); renderTable();
+  toast("Custom criterion removed.");
+}
+
+// ── Site selection ───────────────────────────────────────────────
+function onSiteSelect(e) {
+  const v = e.target.value;
+  document.getElementById("customSite").value = "";
+  currentSite = v||null;
+  v ? loadSiteIntoForm(v) : clearMetrics();
+  updatePreview();
+}
+
+function onCustomSite(e) {
+  const v = e.target.value.trim();
+  document.getElementById("siteSelect").value = "";
+  currentSite = v||null;
+  (v && evaluations[v]) ? loadSiteIntoForm(v) : clearMetrics();
+  updatePreview();
+}
+
+function loadSiteIntoForm(name) {
+  const rec = evaluations[name];
+  METRICS.filter(m=>!excludedKeys.has(m.key)).forEach(m => {
+    const el = document.getElementById("m_"+m.key); if (!el) return;
+    const v = rec ? rec[m.key] : null;
+    el.value = v===1?"1":v===0?"0":"";
+  });
+  updatePreview();
+}
+
+// ── Scoring ──────────────────────────────────────────────────────
+function calcScore(rec) {
+  let yes=0, answered=0;
+  METRICS.filter(m=>!excludedKeys.has(m.key)).forEach(m => {
+    if (rec[m.key]===1)      {yes++;answered++;}
+    else if (rec[m.key]===0) {answered++;}
+  });
+  return {yes, answered, max: METRICS.filter(m=>!excludedKeys.has(m.key)).length};
+}
+
+function getRanked() {
+  return Object.entries(evaluations)
+    .map(([name,rec])=>({name,rec,...calcScore(rec)}))
+    .sort((a,b)=>b.yes-a.yes||a.name.localeCompare(b.name));
+}
+
+// ── Score preview ────────────────────────────────────────────────
+function updatePreview() {
+  let yes=0, answered=0;
+  METRICS.filter(m=>!excludedKeys.has(m.key)).forEach(m => {
+    const el=document.getElementById("m_"+m.key); if(!el) return;
+    if (el.value==="1"){yes++;answered++;} else if(el.value==="0"){answered++;}
+  });
+  document.getElementById("previewScore").textContent = answered>0?yes:"—";
+  document.getElementById("previewDenom").textContent = `/ ${answered} answered`;
+  document.getElementById("previewBar").style.width   = answered>0?(yes/answered*100)+"%":"0%";
+}
+
+// ── Save / Delete / Clear ────────────────────────────────────────
+function saveSite() {
+  const name = getSiteName();
+  if (!name) { toast("⚠ Please select or enter a site.", 3500); return; }
+  const rec = evaluations[name]||{};
+  METRICS.forEach(m => {
+    const el = document.getElementById("m_"+m.key); if (!el) return;
+    const v = el.value;
+    rec[m.key] = v==="1"?1:v==="0"?0:null;
+  });
+  rec.updated = new Date().toISOString();
+  evaluations[name] = rec; currentSite = name;
+  saveStorage(); renderTable();
+  toast(`✓ "${name}" saved.`);
+}
+
+function deleteSite() {
+  const name = getSiteName();
+  if (!name||!evaluations[name]) { toast("No saved record for this site."); return; }
+  if (!confirm(`Delete evaluation for "${name}"?`)) return;
+  delete evaluations[name]; saveStorage(); clearForm(); renderTable();
+  toast(`🗑 "${name}" deleted.`);
+}
+
+function clearForm() {
+  document.getElementById("siteSelect").value = "";
+  document.getElementById("customSite").value = "";
+  clearMetrics(); currentSite=null; updatePreview();
+}
+
+function clearMetrics() { document.querySelectorAll(".metric-sel").forEach(s=>s.value=""); }
+
+function getSiteName() {
+  return document.getElementById("customSite").value.trim()
+      || document.getElementById("siteSelect").value || null;
+}
+
+// ── Render: Desktop table + Mobile cards ─────────────────────────
+function renderTable() {
+  const ranked = getRanked();
+  const active = METRICS.filter(m=>!excludedKeys.has(m.key));
+
+  // ── Desktop table ──
+  const thead = document.getElementById("tableHead");
+  thead.innerHTML = `<th>#</th><th>Recruiting Site</th>`
+    + active.map(m=>`<th title="${escH(m.label+' — '+m.tip)}">${escH(m.label.split(' ').slice(0,2).join(' '))}</th>`).join("")
+    + `<th>Score</th><th>Updated</th>`;
+
+  const tbody = document.getElementById("rankBody");
+  if (!ranked.length) {
+    tbody.innerHTML=`<tr><td colspan="${active.length+4}">
+      <div class="empty-state">
+        <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <path d="M9 17H5a2 2 0 0 0-2 2v2h18v-2a2 2 0 0 0-2-2h-4M12 3v10m-4-4 4 4 4-4"/></svg>
+        <p>No sites scored yet.<br>Select a site and fill in what you know.</p>
+      </div></td></tr>`;
+  } else {
+    let rank=1, rows="";
+    ranked.forEach((item,idx)=>{
+      if(idx>0&&item.yes<ranked[idx-1].yes) rank=idx+1;
+      const bc = rank===1?"rank-1":rank===2?"rank-2":rank===3?"rank-3":"rank-other";
+      const pct = item.answered>0?item.yes/item.answered:0;
+      const cc  = item.answered===0?"chip-none":pct>=.75?"chip-hi":pct>=.45?"chip-mid":"chip-lo";
+      const sl  = item.answered>0?`${item.yes}/${item.answered}`:"—";
+      const ts  = item.rec.updated?fmtDate(item.rec.updated):"—";
+      const sel = item.name===currentSite;
+      const cells = active.map(m=>{
+        const v=item.rec[m.key];
+        return `<td title="${escH(m.label)}: ${v===1?'Yes':v===0?'No':'—'}"><span class="dot ${v===1?'dot-yes':v===0?'dot-no':'dot-blank'}"></span></td>`;
+      }).join("");
+      rows+=`<tr class="${sel?'selected-row':''}" onclick="rowClick('${escQ(item.name)}')">
+        <td><span class="rank-badge ${bc}">${rank}</span></td>
+        <td style="font-size:.78rem;max-width:180px;word-break:break-word">${escH(item.name)}</td>
+        ${cells}
+        <td><span class="score-chip ${cc}">${sl}</span></td>
+        <td class="ts">${ts}</td>
+      </tr>`;
+    });
+    tbody.innerHTML = rows;
+  }
+
+  // ── Mobile card list ──
+  renderMobileCards(ranked, active);
+}
+
+function renderMobileCards(ranked, active) {
+  const list = document.getElementById("mobileRankList");
+  if (!ranked.length) {
+    list.innerHTML=`<div class="empty-state">
+      <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+        <path d="M9 17H5a2 2 0 0 0-2 2v2h18v-2a2 2 0 0 0-2-2h-4M12 3v10m-4-4 4 4 4-4"/></svg>
+      <p>No sites scored yet.<br>Select a site and fill in what you know.</p>
+    </div>`;
+    return;
+  }
+  let rank=1, html="";
+  ranked.forEach((item,idx)=>{
+    if(idx>0&&item.yes<ranked[idx-1].yes) rank=idx+1;
+    const bc  = rank===1?"rank-1":rank===2?"rank-2":rank===3?"rank-3":"rank-other";
+    const pct = item.answered>0?item.yes/item.answered:0;
+    const cc  = item.answered===0?"chip-none":pct>=.75?"chip-hi":pct>=.45?"chip-mid":"chip-lo";
+    const sl  = item.answered>0?`${item.yes}/${item.answered}`:"—";
+    const ts  = item.rec.updated?fmtDate(item.rec.updated):"—";
+    const sel = item.name===currentSite;
+    const dots = active.map(m=>{
+      const v=item.rec[m.key];
+      return `<span class="rank-card-dot-item"><span class="dot ${v===1?'dot-yes':v===0?'dot-no':'dot-blank'}"></span><span>${escH(m.label.split(' ')[0])}</span></span>`;
+    }).join("");
+    html+=`<div class="rank-card${sel?' selected-row':''}" onclick="rowClick('${escQ(item.name)}')">
+      <div class="rank-card-top">
+        <span class="rank-badge ${bc}">${rank}</span>
+        <span class="rank-card-name">${escH(item.name)}</span>
+        <span class="score-chip ${cc}">${sl}</span>
+      </div>
+      <div class="rank-card-dots">${dots}</div>
+      <div class="rank-card-footer"><span class="rank-card-ts">Updated: ${ts}</span></div>
+    </div>`;
+  });
+  list.innerHTML = html;
+}
+
+// ── Row / card click ─────────────────────────────────────────────
+function rowClick(name) {
+  currentSite = name;
+  if (SITE_LIST.includes(name)) {
+    document.getElementById("siteSelect").value = name;
+    document.getElementById("customSite").value = "";
+  } else {
+    document.getElementById("siteSelect").value = "";
+    document.getElementById("customSite").value = name;
+  }
+  loadSiteIntoForm(name);
+  renderTable();
+  // On mobile: switch to form tab
+  if (window.innerWidth <= 600) switchTab(0);
+  document.getElementById("tabForm").scrollIntoView({behavior:"smooth"});
+}
+
+// ── Exports ──────────────────────────────────────────────────────
+function exportCSV() {
+  const ranked = getRanked();
+  if (!ranked.length) { toast("Nothing to export yet."); return; }
+  const active = METRICS.filter(m=>!excludedKeys.has(m.key));
+  const hdrs   = ["Rank","Recruiting Site",...active.map(m=>m.label),"Yes","Answered","Updated"];
+  let rank=1;
+  const rows = ranked.map((item,idx)=>{
+    if(idx>0&&item.yes<ranked[idx-1].yes) rank=idx+1;
+    return [rank,`"${item.name}"`,...active.map(m=>item.rec[m.key]??""),item.yes,item.answered,item.rec.updated||""].join(",");
+  });
+  download("eis_siterank_export.csv",[hdrs.join(","),...rows].join("\n"),"text/csv");
+  toast("✓ CSV exported.");
+}
+
+function exportJSON() {
+  if (!Object.keys(evaluations).length) { toast("Nothing to export yet."); return; }
+  download("eis_siterank_export.json",
+    JSON.stringify({exported:new Date().toISOString(),evaluations},null,2),"application/json");
+  toast("✓ JSON exported.");
+}
+
+function download(fn,content,mime) {
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([content],{type:mime}));
+  a.download=fn; a.click();
+}
+
+// ── Utilities ────────────────────────────────────────────────────
+function toast(msg,dur=2400) {
+  const t=document.getElementById("toast");
+  t.textContent=msg; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"),dur);
+}
+
+function fmtDate(iso) {
+  const d=new Date(iso);
+  return d.toLocaleDateString("en-US",{month:"short",day:"numeric"})+" "+
+         d.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"});
+}
+
+function escH(s=""){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function escQ(s=""){return String(s).replace(/\\/g,"\\\\").replace(/'/g,"\\'");}
+
+init();
+</script>
+</body>
+</html>
